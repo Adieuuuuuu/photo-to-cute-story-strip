@@ -1,4 +1,4 @@
 interface:
-  display_name: "照片三变可爱四联画"
-  short_description: "用一张原图生成韩系插画、童话绘本和积木艺术的纵向四联成图"
-  default_prompt: "Use $photo-to-cute-story-strip to turn this photo into one cute vertical four-panel story strip."
+  display_name: "指定主体可爱四联画"
+  short_description: "从任意比例照片锁定指定主体，生成标准可爱四联画"
+  default_prompt: "Use $photo-to-cute-story-strip to isolate my requested subject from this photo and create one standardized cute four-panel story strip."

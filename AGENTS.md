@@ -11,6 +11,15 @@ Publish the reusable `photo-to-cute-story-strip` Codex Skill as a standalone pub
 - `README.zh-CN.md`: Chinese documentation.
 - `LICENSE`: MIT license.
 
+## Behavioral contract
+
+- Accept one raster source image at any common aspect ratio. A user-named person, animal, food item, or object is the target; when no target is named, use the sole or visually dominant subject.
+- Normalize the real source photo to one inspected `3:1` subject-aware panel before generation. All four final bands must share that exact aspect ratio and equal height.
+- The default fidelity workflow is: prepare the canonical source panel, generate only the three stylized panels from it, then prepend the canonical panel mechanically. The top band must retain real source pixels rather than a model reconstruction.
+- Keep direct one-pass four-panel generation only as an explicit alternative for users who prioritize seamless rendering over exact source preservation.
+- Cropping parameters must be deterministic and auditable. Never silently replace a requested subject, include unrelated nearby objects as co-subjects, or claim a crop is acceptable before inspecting it.
+- Do not commit source photos, generated tests, crop manifests, or machine-specific paths. Public examples must be separately licensed and intentionally added.
+
 ## Public-release constraints
 
 - Never include the user's source photo, generated test images, local manifests, credentials, tokens, absolute user paths, private repository data, or test-only dependencies.

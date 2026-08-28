@@ -9,21 +9,22 @@ A Codex Skill that turns one source photo into one vertical four-panel story str
 3. textured children's-book print;
 4. building-block diorama.
 
-The Skill first tries a cohesive one-pass generation. If the generated top panel drifts from the source—or the user explicitly requires the actual original photo—it generates the lower three panels and deterministically prepends a crop of the source image.
+The default workflow accepts any common source aspect ratio, isolates the user-named or visually dominant subject, prepares and inspects one canonical `3:1` source crop, generates only the lower three styles from that crop, and mechanically prepends the real source pixels. A one-pass four-panel generation remains available only when the user explicitly accepts a generated top band.
 
 ## What it preserves
 
-- subject identity, count, pose or action, gaze, silhouette, and camera direction;
+- a user-selected person, pet, animal, food dish, or object, even when other subjects are visible;
+- subject identity, count, pose or action, gaze, silhouette, camera direction, and defining food details;
 - distinguishing colors, markings, props, and recognizable background anchors;
 - fixed media order and a clean `3:4` stacked layout;
-- exact source pixels in fidelity mode after deterministic resizing and cropping.
+- exact source pixels in the default workflow after deterministic, inspectable resizing and cropping.
 
 ## Requirements
 
 - Codex with the built-in image generation tool.
-- For the optional fidelity fallback on Windows: PowerShell, `ffmpeg`, and `ffprobe` available on `PATH`.
+- On Windows: PowerShell, `ffmpeg`, and `ffprobe` available on `PATH` for the canonical crop and compositor.
 
-The primary direct-generation path does not require an API key. The included compositor does not install dependencies or modify the source image.
+The built-in generation path does not require an API key. The included crop and compositor scripts do not install dependencies or modify the source image.
 
 ## Install
 
@@ -58,20 +59,20 @@ $photo-to-cute-story-strip
 Optional instructions can be appended, for example:
 
 ```text
-$photo-to-cute-story-strip Keep the top panel as the actual original photo and use no decorative title.
+$photo-to-cute-story-strip Keep the large bowl in the center, exclude the dessert cup, and use no decorative title.
 ```
 
 ## Workflow
 
 The Skill:
 
-1. inspects the source and writes a compact identity/composition anchor;
-2. generates a complete four-panel image in one pass;
-3. validates panel count, order, source fidelity, subject continuity, media separation, anatomy, text, and watermark absence;
-4. switches to the deterministic fidelity fallback when the top panel is not trustworthy;
-5. saves one final image and reports which mode won.
+1. inspects the source, resolves the requested subject, and writes a compact identity/composition anchor;
+2. prepares an exact `3:1` source panel with auditable focus and zoom values, then visually checks the crop;
+3. generates a square three-band stack containing only the flat illustration, textured print, and brick diorama;
+4. prepends the approved real source panel and validates exact dimensions, panel order, source fidelity, continuity, media separation, text, and watermark absence;
+5. saves one final image and reports the selected subject and any unavoidable crop limitation.
 
-The fidelity compositor refuses to overwrite an existing output and writes a SHA-256 manifest beside the result.
+Both helpers refuse to overwrite an existing output and write SHA-256 manifests beside their results.
 
 ## Repository layout
 
@@ -81,6 +82,7 @@ photo-to-cute-story-strip/
 |-- agents/
 |   `-- openai.yaml
 `-- scripts/
+    |-- prepare_source_panel.ps1
     `-- compose_story_strip.ps1
 ```
 

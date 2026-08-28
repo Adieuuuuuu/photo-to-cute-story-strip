@@ -4,9 +4,6 @@ param(
     [string]$SourcePath,
 
     [Parameter(Mandatory = $true)]
-    [string]$TriptychPath,
-
-    [Parameter(Mandatory = $true)]
     [string]$OutputPath,
 
     [ValidateRange(0.0, 1.0)]
@@ -16,19 +13,29 @@ param(
     [double]$FocusY = 0.5,
 
     [ValidateRange(1.0, 4.0)]
-    [double]$Zoom = 1.0
+    [double]$Zoom = 1.0,
+
+    [ValidateRange(600, 6000)]
+    [int]$Width = 1536
 )
 
 $ErrorActionPreference = 'Stop'
 
-foreach ($path in @($SourcePath, $TriptychPath)) {
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        throw "Input image does not exist: $path"
-    }
+if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
+    throw "Input image does not exist: $SourcePath"
+}
+
+if (($Width % 6) -ne 0) {
+    throw 'Width must be divisible by 6 so all four final panels can have equal integer dimensions.'
 }
 
 if (Test-Path -LiteralPath $OutputPath) {
     throw "Output already exists; choose a new path: $OutputPath"
+}
+
+$manifestPath = "$OutputPath.manifest.json"
+if (Test-Path -LiteralPath $manifestPath) {
+    throw "Manifest already exists; choose a new output path: $manifestPath"
 }
 
 foreach ($command in @('ffmpeg', 'ffprobe')) {
@@ -54,61 +61,41 @@ function Get-ImageDimensions {
 }
 
 $sourceDimensions = Get-ImageDimensions -Path $SourcePath
-$triptychDimensions = Get-ImageDimensions -Path $TriptychPath
-$triptychRatio = $triptychDimensions[0] / [double]$triptychDimensions[1]
-
-if ($triptychRatio -lt 0.80 -or $triptychRatio -gt 1.20) {
-    throw "Triptych must be approximately square before compositing; actual dimensions are $($triptychDimensions[0])x$($triptychDimensions[1])."
-}
-
-$width = [int]$triptychDimensions[0]
-$width -= ($width % 6)
-$panelHeight = [int]($width / 3.0)
-$expectedHeight = $panelHeight * 4
-
+$panelHeight = [int]($Width / 3)
 $focusXText = "$FocusX" -replace ',', '.'
 $focusYText = "$FocusY" -replace ',', '.'
 $zoomText = "$Zoom" -replace ',', '.'
+
 $cropX = "max(0\,min(iw-ow\,iw*${focusXText}-ow/2))"
 $cropY = "max(0\,min(ih-oh\,ih*${focusYText}-oh/2))"
-
-$filter = "[0:v]scale=${width}:${panelHeight}:force_original_aspect_ratio=increase,scale=iw*${zoomText}:ih*${zoomText},crop=${width}:${panelHeight}:${cropX}:${cropY},setsar=1[src];" +
-          "[1:v]scale=${width}:${width}:force_original_aspect_ratio=increase,crop=${width}:${width}:(in_w-out_w)/2:(in_h-out_h)/2,setsar=1[trip];" +
-          '[src][trip]vstack=inputs=2,format=rgba[out]'
+$filter = "scale=${Width}:${panelHeight}:force_original_aspect_ratio=increase," +
+          "scale=iw*${zoomText}:ih*${zoomText}," +
+          "crop=${Width}:${panelHeight}:${cropX}:${cropY},setsar=1,format=rgba"
 
 $arguments = @(
     '-hide_banner', '-loglevel', 'error', '-n',
     '-i', $SourcePath,
-    '-i', $TriptychPath,
-    '-filter_complex', $filter,
-    '-map', '[out]',
+    '-vf', $filter,
     '-frames:v', '1',
     $OutputPath
 )
 
 & ffmpeg @arguments
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $OutputPath -PathType Leaf)) {
-    throw 'ffmpeg failed to create the story strip.'
+    throw 'ffmpeg failed to create the canonical source panel.'
 }
 
 $outputDimensions = Get-ImageDimensions -Path $OutputPath
-if ($outputDimensions[0] -ne $width -or $outputDimensions[1] -ne $expectedHeight) {
-    throw "Unexpected output dimensions: $($outputDimensions[0])x$($outputDimensions[1]); expected ${width}x${expectedHeight}."
-}
-
-$manifestPath = "$OutputPath.manifest.json"
-if (Test-Path -LiteralPath $manifestPath) {
-    throw "Manifest already exists; choose a new output path: $manifestPath"
+if ($outputDimensions[0] -ne $Width -or $outputDimensions[1] -ne $panelHeight) {
+    throw "Unexpected output dimensions: $($outputDimensions[0])x$($outputDimensions[1]); expected ${Width}x${panelHeight}."
 }
 
 $manifest = @{
-    mode = 'fidelity-composite'
+    mode = 'subject-aware-source-crop'
     source_path = (Resolve-Path -LiteralPath $SourcePath).Path
     source_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $SourcePath).Hash
     source_dimensions = "$($sourceDimensions[0])x$($sourceDimensions[1])"
-    triptych_path = (Resolve-Path -LiteralPath $TriptychPath).Path
-    triptych_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $TriptychPath).Hash
-    triptych_dimensions = "$($triptychDimensions[0])x$($triptychDimensions[1])"
+    target_aspect_ratio = '3:1'
     focus_x = $FocusX
     focus_y = $FocusY
     zoom = $Zoom
